@@ -1,0 +1,87 @@
+{
+  "type": "interactive_message",
+  "actions": [
+    {
+      "name": "break_glass",
+      "type": "button",
+      "value": "break_glass"
+    }
+  ],
+  "callback_id": "deployment_abc",
+  "team": {
+    "id": "...",
+    "domain": "my-slack"
+  },
+  "channel": {
+    "id": "...",
+    "name": "deployments"
+  },
+  "user": {
+    "id": "...",
+    "name": "james"
+  },
+  "action_ts": "....398689",
+  "message_ts": "....688119",
+  "attachment_id": "1",
+  "token": "...",
+  "is_app_unfurl": false,
+  "enterprise": null,
+  "is_enterprise_install": false,
+  "original_message": {
+    "bot_id": "...",
+    "type": "message",
+    "text": "",
+    "user": "...",
+    "ts": "....688119",
+    "app_id": "...",
+    "team": "...",
+    "bot_profile": {
+      "id": "...",
+      "deleted": false,
+      "name": "Live Laugh Ship",
+      "updated": 1655666115,
+      "app_id": "...",
+      "icons": {
+        "image_36": "https:\/\/avatars.slack-edge.com\/2022-06-19\/3..._36.png",
+        "image_48": "https:\/\/avatars.slack-edge.com\/2022-06-19\/3..._48.png",
+        "image_72": "https:\/\/avatars.slack-edge.com\/2022-06-19\/3..._72.png"
+      },
+      "team_id": "..."
+    },
+    "attachments": [
+      {
+        "id": 1,
+        "color": "fc6f03",
+        "fallback": "Deployment ABC is being rolled back.",
+        "text": "Deployment *ABC* is being rolled back.",
+        "callback_id": "deployment_abc",
+        "actions": [
+          {
+            "id": "1",
+            "name": "retry",
+            "text": "Retry",
+            "type": "button",
+            "value": "retry",
+            "style": ""
+          },
+          {
+            "id": "2",
+            "name": "break_glass",
+            "text": "Break Glass Prod",
+            "type": "button",
+            "value": "break_glass",
+            "style": "danger",
+            "confirm": {
+              "text": "Are you sure?",
+              "title": "Are you sure?",
+              "ok_text": "Yes",
+              "dismiss_text": "No"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "response_url": "https:\/\/hooks.slack.com\/actions\/...",
+  "trigger_id": "367507467...8c7ae44f2e6a3a"
+}
