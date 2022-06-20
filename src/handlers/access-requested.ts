@@ -9,13 +9,16 @@ import { IParameterStore } from "../shared/CachedSSM";
 const accessRequestedEvent = z
   .object({
     type: z.enum(["interactive_message"]),
-    actions: z.array(
-      z.object({
-        name: z.enum(["break_glass"]),
-        type: z.enum(["button"]),
-        value: z.string(),
-      }),
-    ),
+    actions: z
+      .array(
+        z.object({
+          name: z.enum(["break_glass"]),
+          type: z.enum(["button"]),
+          value: z.string(),
+        }),
+      )
+      .min(1)
+      .max(1),
     user: z.object({
       id: z.string(),
       name: z.string(),
@@ -26,6 +29,15 @@ const accessRequestedEvent = z
           z
             .object({
               callback_id: z.string(),
+              actions: z
+                .array(
+                  z.object({
+                    name: z.string(),
+                    type: z.string(),
+                    value: z.string(),
+                  }),
+                )
+                .min(1),
             })
             .passthrough(),
         ),
@@ -98,8 +110,31 @@ export function buildAccessRequestedHandler(
       const [_, accountId] =
         eventData.original_message.attachments[0].callback_id.split("_");
 
-      // This could come from the button name etc
-      const role = "break-glass-production";
+      const action = eventData.original_message.attachments
+        .map((attachment) => {
+          return attachment.actions.find((action) => {
+            return (
+              action.type === eventData.actions[0].type &&
+              action.name === eventData.actions[0].name
+            );
+          });
+        })
+        .find((action) => !!action);
+
+      if (!action) {
+        console.log(
+          `failed to find action in attachments: ${JSON.stringify(
+            eventData.original_message.attachments,
+          )} - actions: ${JSON.stringify(eventData.actions)}`,
+        );
+
+        return {
+          statusCode: 500,
+          body: "Failed to identify action.",
+        };
+      }
+
+      const role = action.value;
 
       const messagingServicePrincipal = eventData.user.id;
 

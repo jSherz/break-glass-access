@@ -1,12 +1,11 @@
 import { Context } from "aws-lambda/handler";
 import {
-  CreateAccountAssignmentCommand,
   DeleteAccountAssignmentCommand,
+  DescribeAccountAssignmentDeletionStatusCommand,
   SSOAdminClient,
-  UpdatePermissionSetCommand,
+  StatusValues,
 } from "@aws-sdk/client-sso-admin";
 import * as z from "zod";
-import { DataStorage } from "../shared/DataStorage";
 
 const revokeAccessEvent = z
   .object({
@@ -29,7 +28,7 @@ export function buildRevokeAccessHandler(
   ): Promise<void> {
     const event = revokeAccessEvent.parse(rawEvent);
 
-    await ssoClient.send(
+    const result = await ssoClient.send(
       new DeleteAccountAssignmentCommand({
         InstanceArn: instanceArn,
         PermissionSetArn: event.role,
@@ -40,6 +39,44 @@ export function buildRevokeAccessHandler(
       }),
     );
 
-    console.log("removed access");
+    if (
+      result.AccountAssignmentDeletionStatus?.Status === StatusValues.SUCCEEDED
+    ) {
+      console.log("revoked access with no waiting");
+      return;
+    }
+
+    let completed = false;
+
+    while (!completed) {
+      const currentResult = await ssoClient.send(
+        new DescribeAccountAssignmentDeletionStatusCommand({
+          InstanceArn: instanceArn,
+          AccountAssignmentDeletionRequestId:
+            result.AccountAssignmentDeletionStatus?.RequestId,
+        }),
+      );
+
+      if (
+        currentResult.AccountAssignmentDeletionStatus?.Status ===
+        StatusValues.FAILED
+      ) {
+        throw new Error(
+          `failed to revoke access: ${JSON.stringify(
+            currentResult.AccountAssignmentDeletionStatus,
+          )}`,
+        );
+      }
+
+      if (
+        currentResult.AccountAssignmentDeletionStatus?.Status ===
+        StatusValues.SUCCEEDED
+      ) {
+        console.log("revoked access with waiting");
+        completed = true;
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
+    }
   };
 }
