@@ -1,0 +1,18 @@
+NB: Delays in CloudTrail processing may mean that this data is incomplete. It is not an exhaustive list of all actions performed.
+
+Access report for {{username}}
+Start date: {{startTime}}
+End date: {{endTime}}
+Account ID: {{accountId}}
+
+SSO user activity:
+
+{{#each ssoUserActivity}}
+{{eventSource}},{{eventName}},{{readOnly}},{{num_events}}
+{{/each}}
+
+Assumed role activity:
+
+{{#each assumedRoleActivity}}
+{{eventSource}},{{eventName}},{{readOnly}},{{num_events}}
+{{/each}}

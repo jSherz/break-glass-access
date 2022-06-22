@@ -5,12 +5,12 @@ export abstract class DataStorage {
    * Can a user identified by principal access the given account ID and role?
    *
    * @param accountId AWS account ID
-   * @param role SSO permission set name
+   * @param permissionSetArn SSO permission set
    * @param principal User's ID or ARN
    */
   abstract userCanAccess(
     accountId: string,
-    role: string,
+    permissionSetArn: string,
     principal: string,
   ): Promise<boolean>;
 
@@ -32,7 +32,7 @@ export class DDBDataStorage extends DataStorage {
 
   async userCanAccess(
     accountId: string,
-    role: string,
+    permissionSetArn: string,
     principal: string,
   ): Promise<boolean> {
     const item = await this.client.send(
@@ -40,7 +40,7 @@ export class DDBDataStorage extends DataStorage {
         TableName: this.tableName,
         Key: {
           id: {
-            S: `access#${accountId}#${role}#${principal}`,
+            S: `access#${accountId}#${permissionSetArn}#${principal}`,
           },
         },
       }),

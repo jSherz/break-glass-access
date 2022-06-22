@@ -4,78 +4,185 @@ import {
   CloudWatchLogsClient,
   GetQueryResultsCommand,
   QueryStatus,
+  ResultField,
   StartQueryCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
+import {
+  DescribePermissionSetCommand,
+  SSOAdminClient,
+} from "@aws-sdk/client-sso-admin";
+import { SendEmailCommand, SESClient } from "@aws-sdk/client-ses";
+import handlebars from "handlebars";
+import { promises as fs } from "fs";
+import * as path from "path";
 
 const reportOnAccessEvent = z
   .object({
     startTime: z.string(),
     accountId: z.string(),
-    role: z.string(),
-    principal: z.string(),
+    permissionSetArn: z.string(),
+    principalId: z.string(),
+    principalUsername: z.string(),
   })
   .passthrough();
 
-type ReportOnAccessEvent = z.infer<typeof reportOnAccessEvent>;
+function formatCloudTrailResults(
+  results: ResultField[][],
+): Array<Record<string, unknown>> {
+  return results.reduce((out, row) => {
+    out.push(
+      row.reduce((rowOut, column) => {
+        rowOut[column.field!] = column.value;
+
+        return rowOut;
+      }, {} as Record<string, unknown>),
+    );
+
+    return out;
+  }, [] as Array<Record<string, unknown>>);
+}
+
+async function searchCloudTrail(
+  logsClient: CloudWatchLogsClient,
+  logGroupName: string,
+  queryString: string,
+  startTime: Date,
+  endTime: Date,
+): Promise<Array<Record<string, unknown>>> {
+  const query = await logsClient.send(
+    new StartQueryCommand({
+      logGroupName,
+      queryString,
+      startTime: Math.floor(startTime.getTime() / 1000),
+      endTime: Math.ceil(endTime.getTime() / 1000),
+    }),
+  );
+
+  // ensures this is typed correctly, we either return or throw
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const results = await logsClient.send(
+      new GetQueryResultsCommand({
+        queryId: query.queryId,
+      }),
+    );
+
+    if (
+      results.status === QueryStatus.Failed ||
+      results.status === QueryStatus.Timeout ||
+      results.status === QueryStatus.Cancelled
+    ) {
+      throw new Error(`logs query failed: ${JSON.stringify(results)}`);
+    }
+
+    if (results.status === QueryStatus.Complete) {
+      return formatCloudTrailResults(results.results || []);
+    }
+
+    // Sleep for 15 seconds if we're waiting for results
+    if (
+      results.status === QueryStatus.Running ||
+      results.status === QueryStatus.Scheduled ||
+      results.status === QueryStatus.Unknown
+    ) {
+      console.log(`sleeping while we wait for query: ${results.status}`);
+      await new Promise((resolve) => setTimeout(resolve, 15000));
+    }
+  }
+}
 
 export function buildReportOnAccessHandler(
   logsClient: CloudWatchLogsClient,
   logGroupName: string,
   getTime: () => Date,
+  ssoClient: SSOAdminClient,
+  instanceArn: string,
+  sesClient: SESClient,
+  contactEmail: string,
+  fromEmail: string,
 ) {
   return async function (
     rawEvent: unknown,
-    context: Context,
-    callback: unknown,
+    _context: Context,
+    _callback: unknown,
   ): Promise<void> {
     const event = reportOnAccessEvent.parse(rawEvent);
 
-    // TODO: the real query
+    const startTime = new Date(event.startTime);
+    const endTime = getTime();
 
-    const query = await logsClient.send(
-      new StartQueryCommand({
-        logGroupName,
-        queryString:
-          "fields @timestamp, @message\n" +
-          "| sort @timestamp desc\n" +
-          "| limit 20",
-        startTime: Math.floor(new Date(event.startTime).getTime() / 1000),
-        endTime: Math.ceil(getTime().getTime() / 1000),
+    const ssoUserActivity = await searchCloudTrail(
+      logsClient,
+      logGroupName,
+      `filter userIdentity.principalId == "${event.principalId}"\n` +
+        "| stats count(*) as num_events by eventSource, eventName, readOnly\n" +
+        "| sort by readOnly asc, num_events desc",
+      startTime,
+      endTime,
+    );
+
+    const permissionSet = await ssoClient.send(
+      new DescribePermissionSetCommand({
+        InstanceArn: instanceArn,
+        PermissionSetArn: event.permissionSetArn,
       }),
     );
 
-    let complete = false;
+    const assumedRoleActivity = await searchCloudTrail(
+      logsClient,
+      logGroupName,
+      `filter userIdentity.arn like /arn:aws:sts::${event.accountId}:assumed-role/AWSReservedSSO_${permissionSet.PermissionSet?.Name}_.*/${event.principalUsername}/\n` +
+        "| stats count(*) as num_events by eventSource, eventName, readOnly\n" +
+        "| sort by readOnly asc, num_events desc",
+      startTime,
+      endTime,
+    );
 
-    while (!complete) {
-      const results = await logsClient.send(
-        new GetQueryResultsCommand({
-          queryId: query.queryId,
-        }),
-      );
+    const textTemplate = handlebars.compile(
+      await fs.readFile(
+        path.join(process.cwd(), "templates", "report.txt.hbs"),
+        "utf-8",
+      ),
+    );
 
-      if (
-        results.status === QueryStatus.Failed ||
-        results.status === QueryStatus.Timeout ||
-        results.status === QueryStatus.Cancelled
-      ) {
-        throw new Error(`logs query failed: ${JSON.stringify(results)}`);
-      }
+    const htmlTemplate = handlebars.compile(
+      await fs.readFile(
+        path.join(process.cwd(), "templates", "report.html.hbs"),
+        "utf-8",
+      ),
+    );
 
-      if (results.status === QueryStatus.Complete) {
-        complete = true;
-        console.log(JSON.stringify(results.results));
-      }
+    const templateArgs = {
+      username: event.principalUsername,
+      accountId: event.accountId,
+      ssoUserActivity,
+      assumedRoleActivity,
+    };
 
-      // Sleep for 15 seconds if we're waiting for results
-      if (
-        results.status === QueryStatus.Running ||
-        results.status === QueryStatus.Scheduled ||
-        results.status === QueryStatus.Unknown
-      ) {
-        console.log(`sleeping while we wait for query: ${results.status}`);
-        await new Promise((resolve) => setTimeout(resolve, 15000));
-      }
-    }
+    await sesClient.send(
+      new SendEmailCommand({
+        Destination: {
+          ToAddresses: [contactEmail],
+        },
+        Message: {
+          Body: {
+            Html: {
+              Charset: "utf-8",
+              Data: htmlTemplate(templateArgs),
+            },
+            Text: {
+              Charset: "utf-8",
+              Data: textTemplate(templateArgs),
+            },
+          },
+          Subject: {
+            Charset: "utf-8",
+            Data: `Break glass access report for ${event.principalUsername}`,
+          },
+        },
+        Source: fromEmail,
+      }),
+    );
 
     console.log("reported on access");
   };

@@ -10,12 +10,11 @@ import * as z from "zod";
 const grantAccessEvent = z
   .object({
     accountId: z.string(),
-    role: z.string(),
-    principal: z.string(),
+    permissionSetArn: z.string(),
+    principalId: z.string(),
+    principalUsername: z.string(),
   })
   .passthrough();
-
-type GrantAccessEvent = z.infer<typeof grantAccessEvent>;
 
 export function buildGrantAccessHandler(
   ssoClient: SSOAdminClient,
@@ -23,17 +22,17 @@ export function buildGrantAccessHandler(
 ) {
   return async function (
     rawEvent: unknown,
-    context: Context,
-    callback: unknown,
+    _context: Context,
+    _callback: unknown,
   ): Promise<void> {
     const event = grantAccessEvent.parse(rawEvent);
 
     const result = await ssoClient.send(
       new CreateAccountAssignmentCommand({
         InstanceArn: instanceArn,
-        PermissionSetArn: event.role,
+        PermissionSetArn: event.permissionSetArn,
         PrincipalType: "USER",
-        PrincipalId: event.principal,
+        PrincipalId: event.principalId,
         TargetId: event.accountId,
         TargetType: "AWS_ACCOUNT",
       }),

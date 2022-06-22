@@ -12,6 +12,7 @@
   },
   "scripts": {
     "build": "tsc -p .",
+    "lint": "eslint .",
     "pretty": "prettier --write 'src/**/*.ts' '.eslintrc.js' '.prettierrc.json'"
   },
   "devDependencies": {
@@ -26,10 +27,13 @@
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch-logs": "^3.112.0",
+    "@aws-sdk/client-identitystore": "^3.112.0",
+    "@aws-sdk/client-ses": "^3.112.0",
     "@aws-sdk/client-sfn": "^3.112.0",
     "@aws-sdk/client-ssm": "^3.112.0",
     "@aws-sdk/client-sso-admin": "^3.112.0",
     "@aws-sdk/client-sts": "^3.112.0",
+    "handlebars": "^4.7.7",
     "zod": "^3.17.3"
   }
 }

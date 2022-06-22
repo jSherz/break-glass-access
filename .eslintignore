@@ -1,0 +1,4 @@
+.eslintrc.js
+dist/
+examples/
+node_modules/

@@ -1,0 +1,68 @@
+<html lang="en">
+<body>
+<h2>Access report for {{username}}</h2>
+
+<p>
+  <strong>NB:</strong> Delays in CloudTrail processing may mean that this data
+  is incomplete. It is not an exhaustive list of all actions performed.
+</p>
+
+<dl>
+  <dt>Account ID</dt>
+  <dd>{{accountId}}</dd>
+  <dt>Start date</dt>
+  <dd>{{startTime}}</dd>
+  <dt>End date</dt>
+  <dd>{{endTime}}</dd>
+</dl>
+
+<h3>SSO user activity</h3>
+
+<table>
+  <thead>
+  <tr>
+    <th>Event source</th>
+    <th>Event name</th>
+    <th>Read only</th>
+    <th>Num. events</th>
+  </tr>
+  </thead>
+
+  <tbody>
+  {{#each ssoUserActivity}}
+    <tr>
+      <td>{{eventSource}}</td>
+      <td>{{eventName}}</td>
+      <td>{{readOnly}}</td>
+      <td>{{num_events}}</td>
+    </tr>
+  {{/each}}
+  </tbody>
+</table>
+
+<h3>Assumed role activity</h3>
+
+<table>
+  <thead>
+  <tr>
+    <th>Event source</th>
+    <th>Event name</th>
+    <th>Read only</th>
+    <th>Num. events</th>
+  </tr>
+  </thead>
+
+  <tbody>
+  {{#each assumedRoleActivity}}
+    <tr>
+      <td>{{eventSource}}</td>
+      <td>{{eventName}}</td>
+      <td>{{readOnly}}</td>
+      <td>{{num_events}}</td>
+    </tr>
+  {{/each}}
+  </tbody>
+</table>
+
+</body>
+</html>

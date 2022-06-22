@@ -5,6 +5,10 @@ import { SFNClient, StartExecutionCommand } from "@aws-sdk/client-sfn";
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import * as crypto from "crypto";
 import { IParameterStore } from "../shared/CachedSSM";
+import {
+  DescribeUserCommand,
+  IdentitystoreClient,
+} from "@aws-sdk/client-identitystore";
 
 const accessRequestedEvent = z
   .object({
@@ -46,8 +50,6 @@ const accessRequestedEvent = z
   })
   .passthrough();
 
-type AccessRequestedEvent = z.infer<typeof accessRequestedEvent>;
-
 const UNAUTH_RESPONSE: APIGatewayProxyResult = {
   statusCode: 403,
   body: "Forbidden.",
@@ -65,11 +67,13 @@ export function buildAccessRequestedHandler(
   stateMachineArn: string,
   stepFunctionsClient: SFNClient,
   cachedSSM: IParameterStore,
+  idClient: IdentitystoreClient,
+  identityStoreId: string,
 ) {
   return async function (
     event: APIGatewayProxyEvent,
-    context: Context,
-    callback: unknown,
+    _context: Context,
+    _callback: unknown,
   ): Promise<APIGatewayProxyResult> {
     const slackTimestampHeader = event.headers["x-slack-request-timestamp"];
     const slackSignatureHeader = event.headers["x-slack-signature"];
@@ -134,30 +138,44 @@ export function buildAccessRequestedHandler(
         };
       }
 
-      const role = action.value;
+      const permissionSetArn = action.value;
 
       const messagingServicePrincipal = eventData.user.id;
 
-      const principal = await dataStorage.resolvePrincipal(
+      const principalId = await dataStorage.resolvePrincipal(
         messagingServicePrincipal,
       );
 
-      if (!principal) {
+      if (!principalId) {
         throw new Error(
           `unable to resolve ${messagingServicePrincipal} into an SSO principal`,
         );
       }
 
+      const user = await idClient.send(
+        new DescribeUserCommand({
+          IdentityStoreId: identityStoreId,
+          UserId: principalId,
+        }),
+      );
+
       try {
-        if (await dataStorage.userCanAccess(accountId, role, principal)) {
+        if (
+          await dataStorage.userCanAccess(
+            accountId,
+            permissionSetArn,
+            principalId,
+          )
+        ) {
           await stepFunctionsClient.send(
             new StartExecutionCommand({
               stateMachineArn,
               input: JSON.stringify(
                 {
                   accountId,
-                  role,
-                  principal,
+                  permissionSetArn,
+                  principalId,
+                  principalUsername: user.UserId,
                 },
                 null,
                 2,
@@ -165,7 +183,12 @@ export function buildAccessRequestedHandler(
             }),
           );
 
-          console.log("breaking the glass", accountId, role, principal);
+          console.log(
+            "breaking the glass",
+            accountId,
+            permissionSetArn,
+            principalId,
+          );
 
           return {
             statusCode: 200,
@@ -176,7 +199,12 @@ export function buildAccessRequestedHandler(
             }),
           };
         } else {
-          console.log("user not authorised", accountId, role, principal);
+          console.log(
+            "user not authorised",
+            accountId,
+            permissionSetArn,
+            principalId,
+          );
 
           return {
             statusCode: 200,
