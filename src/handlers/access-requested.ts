@@ -205,6 +205,9 @@ export function buildAccessRequestedHandler(
 
           return {
             statusCode: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
             body: JSON.stringify({
               response_type: "ephemeral",
               replace_original: false,
@@ -221,6 +224,9 @@ export function buildAccessRequestedHandler(
 
           return {
             statusCode: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
             body: JSON.stringify({
               response_type: "ephemeral",
               replace_original: false,
@@ -233,6 +239,9 @@ export function buildAccessRequestedHandler(
 
         return {
           statusCode: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
             response_type: "ephemeral",
             replace_original: false,
