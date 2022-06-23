@@ -80,6 +80,34 @@ actions once logged into an account.](./images/access-report.png)
     the user you think it was. Double check access yourself to make sure nothing
     was missed.
 
+## Data storage and configuration
+
+A DynamoDB table is used for two use cases: converting Slack user IDs into
+SSO principals, and configuring which users can access which permission sets.
+
+Here's an example record for linking a Slack user to an SSO principal ID:
+
+```json
+{
+  "id": {
+    "S": "principal#<slack ID>"
+  },
+  "ssoPrincipal": {
+    "S": "<SSO user UUID>"
+  }
+}
+```
+
+Here's an example record for allowing a user to access a permission set:
+
+```json
+{
+  "id": {
+    "S": "access#<account ID>#<permission set name>#<permission set ARN>"
+  }
+}
+```
+
 ## Building the Lambda function container image
 
 1. Setup your AWS CLI profile.
