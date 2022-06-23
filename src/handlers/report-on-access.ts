@@ -158,6 +158,8 @@ export function buildReportOnAccessHandler(
       accountId: event.accountId,
       ssoUserActivity,
       assumedRoleActivity,
+      startTime,
+      endTime,
     };
 
     await sesClient.send(
