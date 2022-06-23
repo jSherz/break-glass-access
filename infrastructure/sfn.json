@@ -26,7 +26,7 @@
     },
     "WaitForAccessToExpire": {
       "Type": "Wait",
-      "Seconds": 120,
+      "Seconds": 3600,
       "Next": "RevokeAccess"
     },
     "RevokeAccess": {
