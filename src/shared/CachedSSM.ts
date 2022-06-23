@@ -18,7 +18,7 @@ export class CachedSSM implements IParameterStore {
       new GetParameterCommand({
         Name: name,
         WithDecryption: true,
-      })
+      }),
     );
 
     if (result.Parameter?.Value) {

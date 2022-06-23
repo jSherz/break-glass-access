@@ -31,6 +31,8 @@ function formatCloudTrailResults(
   return results.reduce((out, row) => {
     out.push(
       row.reduce((rowOut, column) => {
+        // All columns are titled in this query
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         rowOut[column.field!] = column.value;
 
         return rowOut;
