@@ -13,8 +13,8 @@ if (!process.env.STATE_MACHINE_ARN) {
   throw new Error("You must specify a STATE_MACHINE_ARN.");
 }
 
-if (!process.env.IDENTITY_STORE_ARN) {
-  throw new Error("You must specify a IDENTITY_STORE_ARN.");
+if (!process.env.IDENTITY_STORE_ID) {
+  throw new Error("You must specify a IDENTITY_STORE_ID.");
 }
 
 export const accessRequestedHandler = buildAccessRequestedHandler(
@@ -23,5 +23,5 @@ export const accessRequestedHandler = buildAccessRequestedHandler(
   new SFNClient({}),
   new CachedSSM(),
   new IdentitystoreClient({}),
-  process.env.IDENTITY_STORE_ARN,
+  process.env.IDENTITY_STORE_ID,
 );
