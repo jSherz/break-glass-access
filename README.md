@@ -52,6 +52,11 @@ When the API Gateway deployed in `infrastructure` is hit by Slack (configured
 with the interactivity settings in the Slack app developer portal), it triggers
 the Step Function which grants access, revokes it, and then e-mails a report.
 
+![An example e-mail report in which the user's email is shown, along with 
+the date and time of their access. Two tables are below that information, 
+one showing the user's access in the AWS SSO portal, one showing their 
+actions once logged into an account.](./images/access-report.png)
+
 ## Lambda functions
 
 * access-requested
