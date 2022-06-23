@@ -1,0 +1,88 @@
+{
+  "Comment": "Grants temporary access for emergencies then reports on it.",
+  "StartAt": "GrantAccess",
+  "States": {
+    "GrantAccess": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "Payload.$": "$",
+        "FunctionName": "${grant_access_function_arn}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "WaitForAccessToExpire",
+      "ResultPath": null
+    },
+    "WaitForAccessToExpire": {
+      "Type": "Wait",
+      "Seconds": 120,
+      "Next": "RevokeAccess"
+    },
+    "RevokeAccess": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "Payload.$": "$",
+        "FunctionName": "${revoke_access_function_arn}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "WaitForCloudTrail",
+      "ResultPath": null
+    },
+    "WaitForCloudTrail": {
+      "Type": "Wait",
+      "Seconds": 900,
+      "Next": "ReportOnAccess"
+    },
+    "ReportOnAccess": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "OutputPath": "$.Payload",
+      "Parameters": {
+        "FunctionName": "${report_on_access_function_arn}",
+        "Payload": {
+          "startTime.$": "$$.Execution.StartTime",
+          "accountId.$": "$.accountId",
+          "permissionSetArn.$": "$.permissionSetArn",
+          "principalId.$": "$.principalId",
+          "principalUsername.$": "$.principalUsername"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+      "End": true
+    }
+  }
+}
