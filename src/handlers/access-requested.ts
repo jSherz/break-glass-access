@@ -188,7 +188,7 @@ export function buildAccessRequestedHandler(
                   accountId,
                   permissionSetArn,
                   principalId,
-                  principalUsername: user.UserId,
+                  principalUsername: user.UserName,
                 } as BreakGlassEvent,
                 null,
                 2,
