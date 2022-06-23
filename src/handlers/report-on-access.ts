@@ -132,7 +132,7 @@ export function buildReportOnAccessHandler(
     const assumedRoleActivity = await searchCloudTrail(
       logsClient,
       logGroupName,
-      `filter userIdentity.arn like /arn:aws:sts::${event.accountId}:assumed-role/AWSReservedSSO_${permissionSet.PermissionSet?.Name}_.*/${event.principalUsername}/\n` +
+      `filter userIdentity.arn like /arn:aws:sts::${event.accountId}:assumed-role\\/AWSReservedSSO_${permissionSet.PermissionSet?.Name}_.*\\/${event.principalUsername}/\n` +
         "| stats count(*) as num_events by eventSource, eventName, readOnly\n" +
         "| sort by readOnly asc, num_events desc",
       startTime,
