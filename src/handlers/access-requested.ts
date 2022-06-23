@@ -2,13 +2,18 @@ import { Context } from "aws-lambda/handler";
 import * as z from "zod";
 import { DataStorage } from "../shared/DataStorage";
 import { SFNClient, StartExecutionCommand } from "@aws-sdk/client-sfn";
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
+import {
+  APIGatewayProxyEvent,
+  APIGatewayProxyEventHeaders,
+  APIGatewayProxyResult,
+} from "aws-lambda";
 import * as crypto from "crypto";
 import { IParameterStore } from "../shared/CachedSSM";
 import {
   DescribeUserCommand,
   IdentitystoreClient,
 } from "@aws-sdk/client-identitystore";
+import { BreakGlassEvent } from "../shared/events";
 
 const accessRequestedEvent = z
   .object({
@@ -176,7 +181,7 @@ export function buildAccessRequestedHandler(
                   permissionSetArn,
                   principalId,
                   principalUsername: user.UserId,
-                },
+                } as BreakGlassEvent,
                 null,
                 2,
               ),

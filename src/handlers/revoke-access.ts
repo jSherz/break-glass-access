@@ -5,16 +5,7 @@ import {
   SSOAdminClient,
   StatusValues,
 } from "@aws-sdk/client-sso-admin";
-import * as z from "zod";
-
-const revokeAccessEvent = z
-  .object({
-    accountId: z.string(),
-    permissionSetArn: z.string(),
-    principalId: z.string(),
-    principalUsername: z.string(),
-  })
-  .passthrough();
+import { breakGlassEvent } from "../shared/events";
 
 export function buildRevokeAccessHandler(
   ssoClient: SSOAdminClient,
@@ -25,7 +16,7 @@ export function buildRevokeAccessHandler(
     _context: Context,
     _callback: unknown,
   ): Promise<void> {
-    const event = revokeAccessEvent.parse(rawEvent);
+    const event = breakGlassEvent.parse(rawEvent);
 
     const result = await ssoClient.send(
       new DeleteAccountAssignmentCommand({

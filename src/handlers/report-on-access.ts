@@ -15,16 +15,15 @@ import { SendEmailCommand, SESClient } from "@aws-sdk/client-ses";
 import handlebars from "handlebars";
 import { promises as fs } from "fs";
 import * as path from "path";
+import { breakGlassEvent } from "../shared/events";
 
-const reportOnAccessEvent = z
-  .object({
-    startTime: z.string(),
-    accountId: z.string(),
-    permissionSetArn: z.string(),
-    principalId: z.string(),
-    principalUsername: z.string(),
-  })
-  .passthrough();
+const reportOnAccessEvent = breakGlassEvent.merge(
+  z
+    .object({
+      startTime: z.string(),
+    })
+    .passthrough(),
+);
 
 function formatCloudTrailResults(
   results: ResultField[][],
