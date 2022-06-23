@@ -80,6 +80,14 @@ export function buildAccessRequestedHandler(
     _context: Context,
     _callback: unknown,
   ): Promise<APIGatewayProxyResult> {
+    // Normalise headers
+    event.headers = Object.keys(event.headers).reduce((out, curr) => {
+      if (curr) {
+        out[curr.toLowerCase()] = event.headers[curr];
+      }
+      return out;
+    }, {} as APIGatewayProxyEventHeaders);
+
     const slackTimestampHeader = event.headers["x-slack-request-timestamp"];
     const slackSignatureHeader = event.headers["x-slack-signature"];
 
