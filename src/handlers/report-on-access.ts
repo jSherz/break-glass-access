@@ -141,14 +141,14 @@ export function buildReportOnAccessHandler(
 
     const textTemplate = handlebars.compile(
       await fs.readFile(
-        path.join(process.cwd(), "templates", "report.txt.hbs"),
+        path.join(process.cwd(), "src", "templates", "report.txt.hbs"),
         "utf-8",
       ),
     );
 
     const htmlTemplate = handlebars.compile(
       await fs.readFile(
-        path.join(process.cwd(), "templates", "report.html.hbs"),
+        path.join(process.cwd(), "src", "templates", "report.html.hbs"),
         "utf-8",
       ),
     );
