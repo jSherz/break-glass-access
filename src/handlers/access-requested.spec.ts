@@ -504,12 +504,48 @@ describe("access-requested", () => {
 
     describe("when the event body has an action not in the attachments", () => {
       it("returns a 500 response", async () => {
-        const { handler, paramStore } = buildHandler(sfnArn, sfnClient);
+        const { handler, paramStore, dataStorage } = buildHandler(
+          sfnArn,
+          sfnClient,
+        );
+        const userId = crypto.randomBytes(8).toString("hex");
+        const ssoPrincipalId =
+          "sso-principal-" + crypto.randomBytes(8).toString("hex");
 
         const webhook = {
           ...VALID_SLACK_EVENT,
-          actions: [],
+          user: {
+            id: userId,
+            name: "unused",
+          },
+          original_message: {
+            ...VALID_SLACK_EVENT.original_message,
+            attachments: [
+              {
+                ...VALID_SLACK_EVENT.original_message.attachments[0],
+                actions: [
+                  {
+                    id: "1",
+                    name: "unknown",
+                    text: "Blah",
+                    type: "button",
+                    value: "foo",
+                    style: "",
+                  },
+                ],
+              },
+            ],
+          },
         };
+
+        dataStorage.definePrincipal(userId, ssoPrincipalId);
+
+        dataStorage.defineUserAccess(
+          "abc",
+          "break_glass",
+          ssoPrincipalId,
+          true,
+        );
 
         const body = new URLSearchParams({
           payload: JSON.stringify(webhook),
@@ -538,15 +574,8 @@ describe("access-requested", () => {
         };
 
         await expect(handler(event, {} as any, {})).resolves.toEqual({
-          body: JSON.stringify({
-            response_type: "ephemeral",
-            replace_original: false,
-            text: "Failed to handle Slack's webhook - check the app's logs.",
-          }),
-          headers: {
-            "Content-Type": "application/json",
-          },
-          statusCode: 200,
+          body: "Failed to identify action.",
+          statusCode: 500,
         });
       });
     });
@@ -757,6 +786,74 @@ describe("access-requested", () => {
         permissionSetArn: "break_glass",
         principalId: ssoPrincipalId,
         principalUsername: "foo",
+      });
+    });
+
+    describe("when starting the step function fails", () => {
+      it("returns a descriptive ephemeral message to the user", async () => {
+        const { handler, paramStore, dataStorage } = buildHandler(
+          sfnArn + "fail",
+          sfnClient,
+        );
+
+        const userId = crypto.randomBytes(8).toString("hex");
+        const ssoPrincipalId =
+          "sso-principal-" + crypto.randomBytes(8).toString("hex");
+
+        const webhook = {
+          ...VALID_SLACK_EVENT,
+          user: {
+            id: userId,
+            name: "unused",
+          },
+        };
+
+        dataStorage.definePrincipal(userId, ssoPrincipalId);
+
+        dataStorage.defineUserAccess(
+          "abc",
+          "break_glass",
+          ssoPrincipalId,
+          true,
+        );
+
+        const body = new URLSearchParams({
+          payload: JSON.stringify(webhook),
+        }).toString();
+        const timestamp = "123123";
+        const secret = "my-secret";
+
+        paramStore.setParameter(
+          "/live-laugh-ship/slack-signing-secret",
+          secret,
+        );
+
+        const hash = crypto.createHmac("sha256", secret);
+        hash.update("v0:" + timestamp + ":");
+        hash.update(body);
+        const signature = "v0=" + hash.digest().toString("hex");
+
+        const event: APIGatewayProxyEvent = {
+          ...API_GATEWAY_EVENT,
+          headers: {
+            ...API_GATEWAY_EVENT.headers,
+            "x-slack-request-timestamp": timestamp,
+            "x-slack-signature": signature,
+          },
+          body,
+        };
+
+        await expect(handler(event, {} as any, {})).resolves.toEqual({
+          body: JSON.stringify({
+            response_type: "ephemeral",
+            replace_original: false,
+            text: "An unknown error occurred. CALL THAT PAGER!",
+          }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          statusCode: 200,
+        });
       });
     });
   });
