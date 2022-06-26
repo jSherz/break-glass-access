@@ -46,7 +46,7 @@ export class DDBDataStorage extends DataStorage {
       }),
     );
 
-    return item.Item !== null;
+    return !!item.Item;
   }
 
   async resolvePrincipal(principal: string): Promise<string | null> {

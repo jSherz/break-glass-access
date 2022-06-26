@@ -4,6 +4,10 @@ export interface IParameterStore {
   getParameter(name: string): Promise<string>;
 }
 
+/**
+ * Used to lookup secrets from SSM and cache them between Lambda invocations
+ * where we get to keep the container.
+ */
 export class CachedSSM implements IParameterStore {
   private cache: Record<string, string> = {};
 
