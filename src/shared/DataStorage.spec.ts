@@ -55,6 +55,7 @@ describe("DDBDataStorage", () => {
         await new Promise((resolve) =>
           setTimeout(resolve, Math.round(Math.random() * 50 + attempt * 50)),
         );
+        attempt++;
       }
     }
   });

@@ -9,11 +9,8 @@ import {
 } from "aws-lambda";
 import * as crypto from "crypto";
 import { IParameterStore } from "../shared/CachedSSM";
-import {
-  DescribeUserCommand,
-  IdentitystoreClient,
-} from "@aws-sdk/client-identitystore";
 import { BreakGlassEvent } from "../shared/events";
+import { ISSOUserLookup } from "../shared/SSOUserLookup";
 
 const accessRequestedEvent = z
   .object({
@@ -67,13 +64,26 @@ function signRequest(timestamp: string, body: string, secret: string): string {
   return "v0=" + hash.digest().toString("hex");
 }
 
+function ephemeralMessage(message: string) {
+  return {
+    statusCode: 200,
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      response_type: "ephemeral",
+      replace_original: false,
+      text: message,
+    }),
+  };
+}
+
 export function buildAccessRequestedHandler(
   dataStorage: DataStorage,
   stateMachineArn: string,
   stepFunctionsClient: SFNClient,
   cachedSSM: IParameterStore,
-  idClient: IdentitystoreClient,
-  identityStoreId: string,
+  ssoUserLookup: ISSOUserLookup,
 ) {
   return async function (
     event: APIGatewayProxyEvent,
@@ -117,7 +127,7 @@ export function buildAccessRequestedHandler(
     console.log(bodyParams);
     console.log(bodyParams.get("payload"));
     const buttonEvent = accessRequestedEvent.safeParse(
-      JSON.parse(bodyParams.get("payload") || ""),
+      JSON.parse(bodyParams.get("payload") || '{"success": false}'),
     );
 
     if (buttonEvent.success) {
@@ -160,17 +170,10 @@ export function buildAccessRequestedHandler(
       );
 
       if (!principalId) {
-        throw new Error(
-          `unable to resolve ${messagingServicePrincipal} into an SSO principal`,
+        return ephemeralMessage(
+          `We could not match your user ID ${messagingServicePrincipal} with an AWS SSO principal - ask for the mapping to be created in this app's data store.`,
         );
       }
-
-      const user = await idClient.send(
-        new DescribeUserCommand({
-          IdentityStoreId: identityStoreId,
-          UserId: principalId,
-        }),
-      );
 
       try {
         if (
@@ -188,7 +191,9 @@ export function buildAccessRequestedHandler(
                   accountId,
                   permissionSetArn,
                   principalId,
-                  principalUsername: user.UserName,
+                  principalUsername: await ssoUserLookup.userIdToUserName(
+                    principalId,
+                  ),
                 } as BreakGlassEvent,
                 null,
                 2,
@@ -203,17 +208,9 @@ export function buildAccessRequestedHandler(
             principalId,
           );
 
-          return {
-            statusCode: 200,
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              response_type: "ephemeral",
-              replace_original: false,
-              text: "Glass broken - access incoming.",
-            }),
-          };
+          return ephemeralMessage(
+            "Glass broken - check the AWS SSO account list. This may take a few seconds.",
+          );
         } else {
           console.log(
             "user not authorised",
@@ -222,41 +219,22 @@ export function buildAccessRequestedHandler(
             principalId,
           );
 
-          return {
-            statusCode: 200,
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              response_type: "ephemeral",
-              replace_original: false,
-              text: "You do not have access to this account / role.",
-            }),
-          };
+          return ephemeralMessage(
+            "You do not have access to this account / role.",
+          );
         }
       } catch (err) {
         console.log("could not start flow", err);
 
-        return {
-          statusCode: 200,
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            response_type: "ephemeral",
-            replace_original: false,
-            text: "An unknown error occurred. CALL THAT PAGER!",
-          }),
-        };
+        return ephemeralMessage("An unknown error occurred. CALL THAT PAGER!");
       }
     } else {
       console.log("not an event we can handle", buttonEvent.error);
 
       // Ensure Slack does not retry as we can't handle it regardless
-      return {
-        statusCode: 200,
-        body: "",
-      };
+      return ephemeralMessage(
+        "Failed to handle Slack's webhook - check the app's logs.",
+      );
     }
   };
 }
